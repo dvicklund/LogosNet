@@ -1,0 +1,25 @@
+The program will accept an arbitrary number of connections and receive/send 
+messages according to whether the client is a "participant" or "observer.  
+It is essentially a chat program that has two different types of clients.
+Users will input their username, to be displayed before each mesasge that 
+they send, so others will know who sent it.  The server will broadcast all
+messages to all participants and observers as soon as they are received.
+
+Most challenging issue will be implementing the "select" logic and dealing
+with a great number of open clients.  That will be difficult to test, as it 
+will require several open terminal windows and will be necessarily time consuming.
+
+Resources will include Google (for documentation and examples),
+professor's office hours, and discussing strategies with classmates.
+
+Plan is to meet weekly or more often and implement, in the following order:
+
+1. Demo code
+2. Argument parsing
+3. Packet protocols
+4. Connection observer/participant determination
+5. Unique username logic / 10s timeout
+6. Select() multiple connection handling
+7. Observer / participant association
+8. Type /quit to exit
+9. Public / private message logic
