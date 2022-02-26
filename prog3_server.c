@@ -10,7 +10,8 @@
 #include <unistd.h>
 
 #define QLEN 6 /* size of request queue */
-int visits = 0; /* counts client connections */
+int visits_part = 0; /* counts client connections */
+int visits_obs = 0;
 	
 void handleConnect(int socket, int* socket2, char* buffer, struct sockaddr_in clientAddress, int addressLength);
 int recvString(int sd2, void* string, int size, int flag);
@@ -40,7 +41,11 @@ int main(int argc, char **argv) {
 	int alen_part; /* length of participant address */
     int alen_obs; /* length of observer address */
 	int optval = 1; /* boolean value when we set socket option */
-	char buf[1000]; /* buffer for string the server sends */
+	char buf_part[1000]; /* buffer for string the server sends */
+    char buf_obs[1000];
+    fd_set readfds;
+    int maximum_connections = 255;
+    int maxfd = -1;
 
 	if( argc != 3 ) {
 		fprintf(stderr,"Error: Wrong number of arguments\n");
@@ -120,17 +125,6 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
-    // /* Bind a local address to the socket. For this, you need to pass correct parameters to the bind function. */
-	// if (bind(sd_part_send, (struct sockaddr*) &sad_participant, sizeof(sad_participant)) < 0) {
-	// 	fprintf(stderr,"Error: Bind to participant send port failed\n");
-	// 	exit(EXIT_FAILURE);
-	// }
-
-    // if (bind(sd_obs_send, (struct sockaddr*) &sad_observer, sizeof(sad_observer)) < 0) {
-	// 	fprintf(stderr,"Error: Bind to observer send port failed\n");
-	// 	exit(EXIT_FAILURE);
-	// }
-
 	/* TODO: Specify size of request queue. Listen take 2 parameters -- socket descriptor and QLEN, which has been set at the top of this code. */
 	if (listen(sd_part_listen, QLEN) < 0) {
 		fprintf(stderr,"Error: Listen for participants failed\n");
@@ -142,23 +136,56 @@ int main(int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+    int status;
+
 	/* Main server loop - accept and handle requests */
 	while (1) {
 		alen_part = sizeof(cad_participant);
 		alen_obs = sizeof(cad_observer);
-		if ((sd_part_send = accept(sd_part_listen, (struct sockaddr *)&cad_participant, &alen_part)) < 0) {
-			fprintf(stderr, "Error: Accept from participant failed\n");
-			exit(EXIT_FAILURE);
-		}
-        if ((sd_obs_send = accept(sd_obs_listen, (struct sockaddr *)&cad_observer, &alen_obs)) < 0) {
-			fprintf(stderr, "Error: Accept from observer failed\n");
-			exit(EXIT_FAILURE);
-		}
-		visits++;
-		sprintf(buf,"This server has been contacted %d time%s\n",visits,visits==1?".":"s.");
-		send(sd_part_send, buf, strlen(buf),0);
+
+        FD_ZERO(&readfds);
+
+        FD_SET(sd_part_listen, &readfds);
+        FD_SET(sd_obs_listen, &readfds);
+        if (sd_part_listen > maxfd)
+            maxfd = sd_part_listen;
+        if (sd_obs_listen > maxfd)
+            maxfd = sd_obs_listen;
+
+        status = select(maxfd+1, &readfds, NULL, NULL, NULL);
+
+        if (status < 0) {
+            fprintf(stderr, "Error: selecting failed for some reason\n");
+            exit(EXIT_FAILURE);
+        }
+        
+        if (FD_ISSET(sd_part_listen, &readfds)) {
+            fprintf(stdout, "Listening for participants\n");
+            
+            if ((sd_part_send = accept(sd_part_listen, (struct sockaddr *)&cad_participant, &alen_part)) < 0) {
+                fprintf(stderr, "Error: Accept from participant failed\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        if (FD_ISSET(sd_obs_listen, &readfds)) {
+            fprintf(stdout, "Listening for observers\n");
+        
+            if ((sd_obs_send = accept(sd_obs_listen, (struct sockaddr *)&cad_observer, &alen_obs)) < 0) {
+                fprintf(stderr, "Error: Accept from observer failed\n");
+                exit(EXIT_FAILURE);
+            }
+        }
+        
+		visits_part++;
+        visits_obs++;
+
+		sprintf(buf_part,"This server has been contacted from participants %d time%s\n",visits_part,visits_part==1?".":"s.");
+		sprintf(buf_obs,"This server has been contacted from observers %d time%s\n",visits_obs,visits_obs==1?".":"s.");
+		
+        send(sd_part_send, buf_part, strlen(buf_part),0);
 		close(sd_part_send);
-        send(sd_obs_send, buf, strlen(buf),0);
+        send(sd_obs_send, buf_obs, strlen(buf_obs),0);
 		close(sd_obs_send);
 	}
 }
