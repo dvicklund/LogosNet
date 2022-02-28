@@ -32,6 +32,9 @@ int main( int argc, char **argv) {
 	char *host; /* pointer to host name */
 	int n; /* number of characters read */
 	char buf[1000]; /* buffer for data from the server */
+	char sendBuf[50]; /* buffer for data to send to the server */
+	int ready;
+	fd_set fdSet;
 
 	memset((char *)&sad,0,sizeof(sad)); /* clear sockaddr structure */
 	sad.sin_family = AF_INET; /* set family to Internet */
@@ -81,16 +84,34 @@ int main( int argc, char **argv) {
 		exit(EXIT_FAILURE);
 	}
 
+	printf("Type '/exit' to quit\n");
+
 	/* Repeatedly read data from socket and write to user's screen. */
-	n = recv(sd, buf, sizeof(buf), 0);
-	while (n > 0) {
-		write(1,buf,n);
+	while (1) {
 		n = recv(sd, buf, sizeof(buf), 0);
+		// n = recv(sd, buf, sizeof(buf), 0);
+		write(1,buf,n);
+		printf("\n");
+		
+		ready = select(1, &fdSet, NULL, NULL, NULL);
+
+		if (ready) {
+			scanf("%s", sendBuf);
+			if(strcmp(sendBuf, "/exit") == 0) {
+				close(sd);
+				exit(EXIT_SUCCESS);
+			} else {
+				fflush(STDIN_FILENO);
+				// fflush(STDOUT_FILENO);
+			}
+		} 
 	}
 
-	close(sd);
 
-	exit(EXIT_SUCCESS);
+
+	// close(sd);
+
+	// exit(EXIT_SUCCESS);
 }
 
 // Helper function to receive a string

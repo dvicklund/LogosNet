@@ -46,6 +46,8 @@ int main(int argc, char **argv) {
     fd_set readfds;
     int maximum_connections = 255;
     int maxfd = -1;
+	int observer_fds[255];
+	int participant_fds[255];
 
 	if( argc != 3 ) {
 		fprintf(stderr,"Error: Wrong number of arguments\n");
@@ -138,6 +140,11 @@ int main(int argc, char **argv) {
 
     int status;
 
+	for(int i = 0; i < 255; i++) {
+		observer_fds[i] = 0;
+		participant_fds[i] = 0;
+	}
+
 	/* Main server loop - accept and handle requests */
 	while (1) {
 		alen_part = sizeof(cad_participant);
@@ -147,11 +154,13 @@ int main(int argc, char **argv) {
 
         FD_SET(sd_part_listen, &readfds);
         FD_SET(sd_obs_listen, &readfds);
+
         if (sd_part_listen > maxfd)
             maxfd = sd_part_listen;
         if (sd_obs_listen > maxfd)
             maxfd = sd_obs_listen;
 
+		// Use select to poll all available file descriptors for read readiness
         status = select(maxfd+1, &readfds, NULL, NULL, NULL);
 
         if (status < 0) {
@@ -160,7 +169,8 @@ int main(int argc, char **argv) {
         }
         
         if (FD_ISSET(sd_part_listen, &readfds)) {
-            fprintf(stdout, "Listening for participants\n");
+            fprintf(stdout, "Contacted participant\n");
+			visits_part++;
             
             if ((sd_part_send = accept(sd_part_listen, (struct sockaddr *)&cad_participant, &alen_part)) < 0) {
                 fprintf(stderr, "Error: Accept from participant failed\n");
@@ -169,7 +179,8 @@ int main(int argc, char **argv) {
         }
 
         if (FD_ISSET(sd_obs_listen, &readfds)) {
-            fprintf(stdout, "Listening for observers\n");
+            fprintf(stdout, "Contacted observer\n");
+        	visits_obs++;
         
             if ((sd_obs_send = accept(sd_obs_listen, (struct sockaddr *)&cad_observer, &alen_obs)) < 0) {
                 fprintf(stderr, "Error: Accept from observer failed\n");
@@ -177,16 +188,14 @@ int main(int argc, char **argv) {
             }
         }
         
-		visits_part++;
-        visits_obs++;
 
 		sprintf(buf_part,"This server has been contacted from participants %d time%s\n",visits_part,visits_part==1?".":"s.");
 		sprintf(buf_obs,"This server has been contacted from observers %d time%s\n",visits_obs,visits_obs==1?".":"s.");
 		
         send(sd_part_send, buf_part, strlen(buf_part),0);
-		close(sd_part_send);
+		// close(sd_part_send);
         send(sd_obs_send, buf_obs, strlen(buf_obs),0);
-		close(sd_obs_send);
+		// close(sd_obs_send);
 	}
 }
 
